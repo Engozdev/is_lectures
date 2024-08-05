@@ -1,83 +1,108 @@
-#include <iostream>
 #include <algorithm>
-#include <string>
+#include <cstring>
 #include <fstream>
+#include <iostream>
+#include <cstddef>
+#include <memory>
+
 using namespace std;
 
+struct Args
+{
+    char * filename;
+    bool forward_reading;
+    char delimiter;
+    long long lines_to_read;
+};
 
-int main(int argc, char* argv[])
-{   
-    //cout << argc << "\n";
-    //for (int i = 0; i < argc; i++){
-    //    printf("%d : %s\n", i, argv[i]);
-    //}
-    if (argc < 2) { printf("Введено недостаточное количество параметров"); }
-    else {
-        int lines = -1;
-        bool forward_reading = 0;
-        string delimiter = "\n";
-        string filename = "q";
-        for (int i = 1; i < argc; ++i) {
-            string s = (string)argv[i];
-            if (s == "-l" || s.rfind("--lines=", 0) == 0) {
-                if (s == "-l") { lines =  stoi(argv[i+1]); }
-                if (s.rfind("--lines=", 0) == 0) { int lines = stoi(s.substr(8)); }
+Args parse_args(int argc, char ** argv){
+    Args parse_values;
+    parse_values.lines_to_read = 0;   
+    parse_values.forward_reading = true;
+    parse_values.delimiter = '\n';
+    for (int i = 1; i < argc; ++i){
+            if (strcmp(argv[i], "-l") == 0){parse_values.lines_to_read = std::atoi(argv[i+1]);}
+            else if (strncmp(argv[i], "--lines", 7) == 0){char * temp = argv[i]+8; parse_values.lines_to_read= std::atoi(temp);}
+            else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--tail") == 0) {parse_values.forward_reading = false;}
+            else if (strcmp(argv[i], "-d") == 0) {
+                    if (std::strlen(argv[i+1]) == 2) {
+                        if (argv[i+1][1] == 'n'){parse_values.delimiter = '\n';}
+                        else if (argv[i+1][1] == 't'){parse_values.delimiter = '\t';}
+                        else if(argv[i+1][1] == 'v'){parse_values.delimiter = '\v';}}
+                    else{parse_values.delimiter = argv[i+1][0];}}
+            else if (strncmp(argv[i], "--delimiter", 11) == 0){
+                    char * temp2 = argv[i]+12;
+                    if (std::strlen(temp2) == 2) {
+                        if (temp2[1] == 'n'){parse_values.delimiter = '\n';}
+                        else if (temp2[1] == 't'){parse_values.delimiter = '\t';}
+                        else if (temp2[1] == 'v'){parse_values.delimiter ='\v';}}
+                    else{parse_values.delimiter = argv[i][strlen(argv[i])-1];}}
+            else {
+                parse_values.filename = static_cast<char*>(malloc(sizeof(char)*2));
+                strcpy(parse_values.filename, argv[i]);
             }
-            if (s == "-t" || s == "--tail") { forward_reading = 1;}
-            if (s == "-d" || s.rfind("--delimiter=", 0) == 0) {
-                if (s == "-d") {size_t w = sizeof(argv[i + 1]); 
-                                cout << w << '\n';
-                                for (int j = 0; j < w; ++j){
-                                    cout << argv[i+1][j] << '\n';
-                                }
-                }
-                if (s.rfind("--delimiter=", 0) == 0) { delimiter = s.substr(12); }
-            }
-            if ((int)s.rfind(".txt") > 0) { filename = s;}
-        }   
-
-            char delim = '\n';
-            int strcounter1 = 0;
-            int strcounter2 = 0;
-            int strcounter3 = 0;
-            string line;
-            ifstream file(filename);
-            while (getline(file, line, delim))
-            {
-                strcounter1++;
-                strcounter2++;
-            }
-            file.close();
-            if (lines != -1) { strcounter1 = lines; }
-            if (forward_reading == 0)
-            {   
-                string line1;
-                ifstream file(filename);
-                while (getline(file, line1,delim) && strcounter1)
-                {
-                    std::cout << line1 << '\n';
-                    strcounter1--;
-
-                }
-                file.close();
-            }
-            if (forward_reading == 1){
-                string line2;
-                ifstream file(filename);
-                while (getline(file, line2, delim) && strcounter2)
-                {      
-                    if (strcounter3 >= strcounter2 - lines) {
-                        cout << line2 << '\n';
-                    }
-                    strcounter3++;
-                    strcounter1--;
-
-                }
-                file.close();
-            }
-
-            return 0;
-
-        }
+        } 
+    return parse_values;
 }
 
+void full_output(char delimiter, char * filename){
+    std::ifstream myFile(filename);
+    string line;
+    while (getline(myFile,line, delimiter)){
+        cout << line << '\n';
+    }
+    myFile.close();
+}
+
+void n_forward_output(long long lines_to_read, char delimiter, char * filename){
+    ifstream myFile(filename);
+    string line;
+    while (getline(myFile,line, delimiter) && lines_to_read){
+        cout << line << '\n';
+        lines_to_read--;
+    }
+    myFile.close();
+}
+
+void n_back_output(long long lines_to_read, char delimiter, char * filename){
+    ifstream myFile(filename);
+    long long temp_n_of_lines = lines_to_read;
+    myFile.seekg(-1, std::ifstream::end);
+    long long size = myFile.tellg();
+    char temp;
+    int offset = 0;
+    for (int i = 1; i <= size+1; i++) {
+      myFile.seekg(-i, std::ifstream::end);
+      myFile.get(temp);
+      //cout << temp << " " <<  -i << " " << temp_n_of_lines << '\n';
+      if (temp == delimiter){
+        temp_n_of_lines--;
+        if (temp_n_of_lines == 0){
+            offset = size - i;
+            break;
+        }
+      }
+    }
+    //cout << "\n" << size << " " << offset << '\n';
+    myFile.seekg(offset+1, std::ifstream::beg);
+    for (int i = 0; i <= size - offset+1; ++i){
+        myFile.get(temp);
+        cout << temp;
+    }
+
+}
+
+void output(long long lines_to_read, bool forward_reading, char delimiter, char * filename){
+    if (lines_to_read == 0){full_output(delimiter, filename);}
+    else if (forward_reading) {n_forward_output(lines_to_read, delimiter, filename);}
+    else {n_back_output(lines_to_read, delimiter, filename);}
+}
+
+int main(int argc, char * argv[]){
+    if (argc < 2){std::cout << 0 << '\n';}
+    else{ 
+        Args parsed = parse_args(argc, argv);
+        output(parsed.lines_to_read,parsed.forward_reading, parsed.delimiter, parsed.filename);
+        }
+    return 0;
+}
